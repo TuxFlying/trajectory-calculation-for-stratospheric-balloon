@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stratosphärenballon Flugbahnberechnung</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 0;
+        }
+        
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 0.95em;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.85em;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .map-container {
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 700px;
+        }
+        
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .error.active {
+            display: block;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .info-box h3 {
+            margin-bottom: 10px;
+            color: #1976d2;
+        }
+        
+        .prediction-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            display: none;
+        }
+        
+        .prediction-info.active {
+            display: block;
+        }
+        
+        .prediction-info h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        
+        .prediction-info p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 3px;
+            margin-right: 10px;
+        }
+        
+        @media (max-width: 1200px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            #map {
+                height: 500px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎈 Stratosphärenballon Flugbahnberechnung</h1>
+            <p>Vorhersage der Flugbahn mit Tawhiri API (Thomas Dreymann, DL8LTD @claude.ai)</p>
+        </div>
+        
+        <div class="content">
+            <div class="sidebar">
+                <div class="error" id="error"></div>
+                
+                <div class="info-box">
+                    <h3>ℹ️ Information</h3>
+                    <p>Diese Anwendung nutzt die Tawhiri API zur Berechnung der Flugbahn basierend auf aktuellen Wetterdaten.</p>
+                </div>
+                
+                <form id="predictionForm">
+                    <div class="form-group">
+                        <label for="launchLat">Startposition Breitengrad</label>
+                        <input type="number" id="launchLat" step="0.0001" value="53.9921" required>
+                        <small>Dezimalgrad (z.B. 53.9921 für EDHF)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="launchLon">Startposition Längengrad</label>
+                        <input type="number" id="launchLon" step="0.0001" value="9.5765" required>
+                        <small>Dezimalgrad (z.B. 9.5765 für EDHF)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="launchAlt">Starthöhe</label>
+                        <input type="number" id="launchAlt" step="1" value="0" required>
+                        <small>Meter über Meeresspiegel</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="launchDate">Startdatum</label>
+                        <input type="date" id="launchDate" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="launchTime">Startzeit (UTC)</label>
+                        <input type="time" id="launchTime" value="12:00" required>
+                        <small>Zeitangabe in UTC!</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ascentRate">Aufstiegsrate</label>
+                        <input type="number" id="ascentRate" step="0.1" value="5.0" required>
+                        <small>Meter pro Sekunde (typisch: 5 m/s)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="burstAlt">Platzhöhe</label>
+                        <input type="number" id="burstAlt" step="100" value="30000" required>
+                        <small>Meter (typisch: 30000 m)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="descentRate">Abstiegsrate</label>
+                        <input type="number" id="descentRate" step="0.1" value="5.0" required>
+                        <small>Meter pro Sekunde (typisch: 5 m/s)</small>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="submitBtn">
+                        Flugbahn berechnen
+                    </button>
+                </form>
+                
+                <div class="prediction-info" id="predictionInfo"></div>
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Berechne Flugbahn...</p>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2ecc71;"></div>
+                        <span>Aufstieg</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #e74c3c;"></div>
+                        <span>Abstieg</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Karte initialisieren
+        const map = L.map('map').setView([53.9921, 9.5765], 9);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        let trajectoryLayers = [];
+        let markers = [];
+        
+        // Aktuelles Datum setzen
+        const today = new Date();
+        document.getElementById('launchDate').valueAsDate = today;
+        
+        // Formular-Submit
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Alte Layer entfernen
+            trajectoryLayers.forEach(layer => map.removeLayer(layer));
+            markers.forEach(marker => map.removeLayer(marker));
+            trajectoryLayers = [];
+            markers = [];
+            
+            // Fehler ausblenden
+            document.getElementById('error').classList.remove('active');
+            document.getElementById('predictionInfo').classList.remove('active');
+            
+            // Loading anzeigen
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('submitBtn').disabled = true;
+            
+            // Formulardaten sammeln
+            const launchLat = parseFloat(document.getElementById('launchLat').value);
+            const launchLon = parseFloat(document.getElementById('launchLon').value);
+            const launchAlt = parseFloat(document.getElementById('launchAlt').value);
+            const launchDate = document.getElementById('launchDate').value;
+            const launchTime = document.getElementById('launchTime').value;
+            const ascentRate = parseFloat(document.getElementById('ascentRate').value);
+            const burstAlt = parseFloat(document.getElementById('burstAlt').value);
+            const descentRate = parseFloat(document.getElementById('descentRate').value);
+            
+            // DateTime im ISO-Format
+            const launchDateTime = `${launchDate}T${launchTime}:00Z`;
+            
+            // API-URL zusammenbauen
+            const apiUrl = `https://api.v2.sondehub.org/tawhiri?` +
+                `profile=standard_profile&` +
+                `launch_latitude=${launchLat}&` +
+                `launch_longitude=${launchLon}&` +
+                `launch_altitude=${launchAlt}&` +
+                `launch_datetime=${encodeURIComponent(launchDateTime)}&` +
+                `ascent_rate=${ascentRate}&` +
+                `burst_altitude=${burstAlt}&` +
+                `descent_rate=${descentRate}`;
+            
+            try {
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`API-Fehler: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Flugbahn auf Karte zeichnen
+                drawTrajectory(data);
+                
+                // Informationen anzeigen
+                showPredictionInfo(data);
+                
+            } catch (error) {
+                console.error('Fehler:', error);
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = `Fehler bei der Berechnung: ${error.message}`;
+                errorDiv.classList.add('active');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('submitBtn').disabled = false;
+            }
+        });
+        
+        function drawTrajectory(data) {
+            if (!data.prediction || data.prediction.length === 0) {
+                throw new Error('Keine Vorhersagedaten erhalten');
+            }
+            
+            const bounds = [];
+            
+            data.prediction.forEach((stage, stageIndex) => {
+                const stageName = stage.stage;
+                const trajectory = stage.trajectory;
+                
+                if (!trajectory || trajectory.length === 0) return;
+                
+                // Farbe je nach Stage
+                const color = stageName === 'ascent' ? '#2ecc71' : '#e74c3c';
+                
+                // Punkte für Polyline sammeln
+                const points = trajectory.map(point => {
+                    bounds.push([point.latitude, point.longitude]);
+                    return [point.latitude, point.longitude];
+                });
+                
+                // Polyline zeichnen
+                const polyline = L.polyline(points, {
+                    color: color,
+                    weight: 3,
+                    opacity: 0.8
+                }).addTo(map);
+                
+                trajectoryLayers.push(polyline);
+                
+                // Startpunkt-Marker
+                if (stageIndex === 0 && trajectory.length > 0) {
+                    const start = trajectory[0];
+                    const startMarker = L.marker([start.latitude, start.longitude], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: '🚀',
+                            iconSize: [30, 30]
+                        })
+                    }).addTo(map);
+                    
+                    startMarker.bindPopup(`
+                        <b>Start</b><br>
+                        Position: ${start.latitude.toFixed(4)}°, ${start.longitude.toFixed(4)}°<br>
+                        Höhe: ${start.altitude.toFixed(0)} m<br>
+                        Zeit: ${new Date(start.datetime).toLocaleString('de-DE')}
+                    `);
+                    
+                    markers.push(startMarker);
+                }
+                
+                // Platzpunkt-Marker (Ende des Aufstiegs)
+                if (stageName === 'ascent' && trajectory.length > 0) {
+                    const burst = trajectory[trajectory.length - 1];
+                    const burstMarker = L.marker([burst.latitude, burst.longitude], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: '💥',
+                            iconSize: [30, 30]
+                        })
+                    }).addTo(map);
+                    
+                    burstMarker.bindPopup(`
+                        <b>Platzhöhe erreicht</b><br>
+                        Position: ${burst.latitude.toFixed(4)}°, ${burst.longitude.toFixed(4)}°<br>
+                        Höhe: ${burst.altitude.toFixed(0)} m<br>
+                        Zeit: ${new Date(burst.datetime).toLocaleString('de-DE')}
+                    `);
+                    
+                    markers.push(burstMarker);
+                }
+                
+                // Landepunkt-Marker
+                if (stageName === 'descent' && trajectory.length > 0) {
+                    const landing = trajectory[trajectory.length - 1];
+                    const landingMarker = L.marker([landing.latitude, landing.longitude], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: '🎯',
+                            iconSize: [30, 30]
+                        })
+                    }).addTo(map);
+                    
+                    landingMarker.bindPopup(`
+                        <b>Landung</b><br>
+                        Position: ${landing.latitude.toFixed(4)}°, ${landing.longitude.toFixed(4)}°<br>
+                        Höhe: ${landing.altitude.toFixed(0)} m<br>
+                        Zeit: ${new Date(landing.datetime).toLocaleString('de-DE')}
+                    `);
+                    
+                    markers.push(landingMarker);
+                }
+            });
+            
+            // Karte an Flugbahn anpassen
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+        
+        function showPredictionInfo(data) {
+            const infoDiv = document.getElementById('predictionInfo');
+            
+            let html = '<h3>📊 Vorhersage-Details</h3>';
+            
+            if (data.request) {
+                html += `<p><strong>Dataset:</strong> ${data.request.dataset || 'Latest'}</p>`;
+            }
+            
+            if (data.prediction && data.prediction.length > 0) {
+                const ascent = data.prediction.find(s => s.stage === 'ascent');
+                const descent = data.prediction.find(s => s.stage === 'descent');
+                
+                let ascentStart = null;
+                let ascentEnd = null;
+                
+                if (ascent && ascent.trajectory && ascent.trajectory.length > 0) {
+                    ascentStart = ascent.trajectory[0];
+                    ascentEnd = ascent.trajectory[ascent.trajectory.length - 1];
+                    const ascentDuration = (new Date(ascentEnd.datetime) - new Date(ascentStart.datetime)) / 1000 / 60;
+                    html += `<p><strong>Aufstiegsdauer:</strong> ${ascentDuration.toFixed(1)} Minuten</p>`;
+                }
+                
+                if (descent && descent.trajectory && descent.trajectory.length > 0) {
+                    const descentStart = descent.trajectory[0];
+                    const descentEnd = descent.trajectory[descent.trajectory.length - 1];
+                    const descentDuration = (new Date(descentEnd.datetime) - new Date(descentStart.datetime)) / 1000 / 60;
+                    html += `<p><strong>Abstiegsdauer:</strong> ${descentDuration.toFixed(1)} Minuten</p>`;
+                    
+                    if (ascentStart) {
+                        const totalDuration = ((new Date(descentEnd.datetime) - new Date(ascentStart.datetime)) / 1000 / 60);
+                        html += `<p><strong>Gesamtflugzeit:</strong> ${totalDuration.toFixed(1)} Minuten</p>`;
+                        
+                        // Distanz berechnen (Luftlinie Start-Landung)
+                        const distance = getDistance(
+                            ascentStart.latitude, ascentStart.longitude,
+                            descentEnd.latitude, descentEnd.longitude
+                        );
+                        html += `<p><strong>Entfernung Start-Landung:</strong> ${distance.toFixed(2)} km</p>`;
+                    }
+                }
+            }
+            
+            infoDiv.innerHTML = html;
+            infoDiv.classList.add('active');
+        }
+        
+        // Haversine-Formel zur Distanzberechnung
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Erdradius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+    </script>
+</body>
+</html>
